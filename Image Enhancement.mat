@@ -1,0 +1,287 @@
+%Setup
+img1Orig = imread("PandaOriginal.bmp");
+img1Noise = imread("PandaNoise.bmp");
+img2Orig = imread("PenguinOriginal.bmp");
+img2Noise = imread("PenguinNoise.bmp");
+
+%imgshow and imghist Test
+% imshow(img1Orig)
+% imshow(img1Noise)
+% imshow(img2Orig)
+% imshow(img2Noise)
+% imhist(img1Orig)
+% imhist(img1Noise)
+% imhist(img2Orig)
+% imhist(img2Noise)
+
+%imgRestored preperation
+img1Re = img1Noise; %img1Restored
+img2Re = img2Noise; %img2Restored
+
+%$Run
+img2Re = ImgFFT(img2Re); %Example code for Penguin FFT LPF(69)+Anisotropic + Adjust 
+img2Re = ImgFFTLPF(img2Re, 69);
+img2Re = ImgIFFT(img2Re);
+img2Re = AniFilt(img2Re);
+img2Re = Adjust(img2Re);
+res = ImgIMMSE(img2Orig,img2Re);
+res
+
+%Output
+%writematrix(#,'.csv');
+%imwrite(#,'');
+%imfinfo('')
+
+%Other
+%imcomplement()
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%FUNCTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Topic: Remove the periodic noise
+%Sub-Topic: FFT or DFT and Inverse FFT or DFT
+function imgOut = ImgFFT(imgIn)
+imgIn = fft2(imgIn);
+%#Used only for graph
+imgReal = log(1+abs(fftshift(imgIn)));%Magnitude abs() + Centre shift fourier spectrum (centre of graph) + Log transform (scale graph)
+imshow(imgReal,[]);
+%#
+imgOut = imgIn;
+end
+% Inverse FFT
+function imgOut = ImgIFFT(imgIn)
+imgIn = ifft2(imgIn);
+imgIn = uint8(real(imgIn));
+imshow(imgIn);
+imgOut = imgIn;
+end
+% FFT Graph Show
+function FFTshow(imgIn)
+imgReal = log(1+abs(fftshift(imgIn)));%Magnitude abs() + Centre shift fourier spectrum (centre of graph) + Log transform (scale graph)
+imshow(imgReal,[]);
+end
+%Sub-Topic: Frequency Domain Filters %%TODO
+%Periodic Noise Removal
+%Low-Pass Filter (Center)
+function imgOut = ImgFFTLPF(imgIn, circleSize)
+[x,y] = meshgrid(-(ceil((size(imgIn,2)/2))):floor((size(imgIn,2)/2))-1,-(ceil((size(imgIn,1)/2))):floor((size(imgIn,1)/2))-1);%Make a Grid
+z=sqrt(x.^2+y.^2);%circle equation
+c=z<circleSize;%define circle size
+imgIn = fftshift(imgIn).*c;%need to centre frequency domain then cutout circle
+imgReal = real(log(1-abs(imgIn)));
+imshow(imgReal,[]);
+imgOut = ifftshift(imgIn);
+end
+%Low-Pass Filter (x,y position the circle)
+function imgOut = ImgFFTLPFXY(imgIn, circleSize, xpos, ypos)
+[x,y] = meshgrid(-(ceil((size(imgIn,2)/2))):floor((size(imgIn,2)/2))-1,-(ceil((size(imgIn,1)/2))):floor((size(imgIn,1)/2))-1);%Make a Grid
+z=sqrt((x-xpos).^2+(y+ypos).^2);%circle equation (r=sqrt((x-h)^2 + (y-h)^2)) (y is + since graphs (0,0) in imshow is in top left corner)
+c=z<circleSize;%define circle size
+imgIn = fftshift(imgIn).*c;%need to centre frequency domain then cutout circle
+imgReal = real(log(1-abs(imgIn)));
+imshow(imgReal,[]);
+imgOut = ifftshift(imgIn);
+end
+%%%EXTRA
+%High-Pass Filter (center)
+function imgOut = ImgFFTHPF(imgIn, circleSize)
+[x,y] = meshgrid(-(ceil((size(imgIn,2)/2))):floor((size(imgIn,2)/2))-1,-(ceil((size(imgIn,1)/2))):floor((size(imgIn,1)/2))-1);%Make a Grid
+z=sqrt(x.^2+y.^2);%circle equation
+c=z>circleSize;%define circle size %Note different equality to LPF
+imgIn = fftshift(imgIn).*c;
+imshow(log(1-abs(imgIn)),[]);
+imgOut = imgIn;
+end
+%High-Pass Filter (x,y)
+function imgOut = ImgFFTHPFXY(imgIn, circleSize, xpos, ypos)
+[x,y] = meshgrid(-(ceil((size(imgIn,2)/2))):floor((size(imgIn,2)/2))-1,-(ceil((size(imgIn,1)/2))):floor((size(imgIn,1)/2))-1);%Make a Grid
+z=sqrt((x-xpos).^2+(y+ypos).^2);%circle equation
+c=z>circleSize;%define circle size %Note different equality to LPF
+imgIn = fftshift(imgIn).*c;
+imshow(log(1-abs(imgIn)),[]);
+imgOut = imgIn;
+end
+%Band-Pass Filter (center)
+function imgOut = ImgFFTBPF(imgIn, circleLv1, circleLv2)%Lv1<Lv2
+[x,y] = meshgrid(-(ceil((size(imgIn,2)/2))):floor((size(imgIn,2)/2))-1,-(ceil((size(imgIn,1)/2))):floor((size(imgIn,1)/2))-1);%Make a Grid
+z=sqrt(x.^2+y.^2);%circle equation
+c=z>circleLv2 & z<circleLv1 ;%define circle size %Note different equality to LPF
+imgIn = fftshift(imgIn).*c;
+imshow(log(1-abs(imgIn)),[]);
+imgOut = imgIn;
+end
+%Band-Pass Filter (x,y)
+function imgOut = ImgFFTBPFXY(imgIn, circleLv1, circleLv2, xpos, ypos)%Lv1<Lv2
+[x,y] = meshgrid(-(ceil((size(imgIn,2)/2))):floor((size(imgIn,2)/2))-1,-(ceil((size(imgIn,1)/2))):floor((size(imgIn,1)/2))-1);%Make a Grid
+z=sqrt((x-xpos).^2+(y+ypos).^2);%circle equation
+c=z>circleLv2 & z<circleLv1 ;%define circle size %Note different equality to LPF
+imgIn = fftshift(imgIn).*c;
+imshow(log(1-abs(imgIn)),[]);
+imgOut = imgIn;
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Topic: Remove Random Noise
+%Sub-Topic: Filters Spatial Domain
+%Low Pass Wiener adaptive noise removal filter
+function imgOut = WienerFilt(imgIn, NeighbourM, NeighbourN)
+imgOut = wiener2(imgIn, [NeighbourM,NeighbourN]);
+imshow(imgOut);%For Testing
+end
+%Median Filter
+function imgOut = MedFilter(imgIn)
+imgOut = medfilt2(imgIn);
+imshow(imgOut);%For Testing
+end
+% Gaussian smoothing with Sigma
+function imgOut = GaussSmoothSTD(imgIn, stdvalue) %stdvalue test 1,2,3 std's
+imgOut = imgaussfilt(imgIn, stdvalue);
+imshow(imgOut);%For Testing
+end
+% Gaussian Smoothing
+function imgOut = GaussSmooth(imgIn)%default std = 0.5
+imgOut = imgaussfilt(imgIn);%default std = 0.5
+imshow(imgOut);%For Testing
+end
+% Edge-Preserving Smoothing
+function imgOut = EdgePresSmooth(imgIn)
+imgOut = imguidedfilter(imgIn);
+imshow(imgOut);%For Testing
+end
+%Image Sharpening
+function imgOut = ImageSharp(imgIn)
+imgOut = imsharpen(imgIn);
+imshow(imgOut);%For Testing
+end
+%Box Filter (default)
+function imgOut = BoxFilt(imgIn)%Usually 3x3 neighbourhood grid
+imgOut = imboxfilt(imgIn);
+imshow(imgOut);%For Testing
+end
+%Box Filter N by M
+function imgOut = BoxFiltNM(imgIn, size)%Usually 3x3 neighbourhood grid
+imgOut = imboxfilt(imgIn,size);
+imshow(imgOut);%For Testing
+end
+%Non-local means filtering
+function imgOut = NLMFilt(imgIn)
+imgOut = imnlmfilt(imgIn);
+imshow(imgOut);%For Testing
+end
+%Anisotropic diffusion
+function imgOut = AniFilt(imgIn)
+imgOut = imdiffusefilt(imgIn);
+imshow(imgOut);%For Testing
+end
+%Bilateral Filtering 
+function imgOut = BilaFilt(imgIn)
+imgOut = imbilatfilt(imgIn);
+imshow(imgOut);%For Testing
+end
+%Bilateral Filtering with degree of smoothing control
+function imgOut = BilaFiltDoS(imgIn, x)
+imgOut = imbilatfilt(imgIn,x);
+imshow(imgOut);%For Testing
+end
+%Bilateral Filtering with DoS and spatial Sigma
+function imgOut = BilaFiltDoSSig(imgIn, x, sig)
+imgOut = imbilatfilt(imgIn,x, sig);
+imshow(imgOut);%For Testing
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Topic: Calculate AMSE 
+% to compare restored image with orignal image
+function error = ImgIMMSE(imgOriginal, imgRestored)
+error = immse(imgOriginal, imgRestored);
+end
+% For Optimisation
+function error = ImgIMMSEforOptimisation(imgOriginal, imgRestored)
+error = immse(imgOriginal, imgRestored);
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% EXTRA
+% GreyScale adjust
+function imgOut = Adjust(imgIn)
+imgOut = imadjust(imgIn);
+imshow(imgOut);
+end
+%
+% Histogram Equalisation adjust
+function imgOut = HistEq(imgIn)
+imgOut = histeq(imgIn);
+imshow(imgOut);
+end
+% Contrast-Limited Adaptive Histogram Equalisation
+function imgOut = AdHistEq(imgIn)
+imgOut = adapthisteq(imgIn);
+imshow(imgOut);
+end
+% RGB to Grey
+function imgOut = RGBtoGrey(imgIn)
+imgOut = rgb2gray(imgIn);
+imshow(imgOut);
+end
+%FIR Filters
+%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Tests and Optimal values
+% Optimal FFT Low-Pass
+function count = ImgFFTLPFMax(imgOrig, imgIn)%Input FFT-ed Image
+val = 1000000000000000000000000;% Should be Infinately large but this will do
+count = 0;
+for x = 1:size(imgIn,2)%The bigger dimmension for these sets of images
+hold = ImgFFTLPF(imgIn, x);
+hold = ImgIFFT(hold);
+if (ImgIMMSEforOptimisation(imgOrig, hold) < val)
+val = ImgIMMSEforOptimisation(imgOrig, hold);
+count = x;
+else% stopping point, Image gets too blurry so MSE increases so: (noise<goodImg<tooBlury)
+break;
+end
+end
+end
+%Optimal Wiener Filter
+function count = WienerFiltMax(imgOrig, imgIn)
+    val = 1000000000000000;
+    count = 0;% Do square Matrix Only
+    for x = 3:size(imgIn,1)%Biggest square for data set
+        if (mod(x,2) == 0 )
+            continue;
+        end
+         if (ImgIMMSEforOptimisation(imgOrig, WienerFilt(imgIn, x,x)) < val)
+            val = ImgIMMSEforOptimisation(imgOrig, WienerFilt(imgIn, x,x));
+            count = x;
+         else
+             break;
+        end
+    end
+end
+%Optimal GaussianSTD
+function count = GaussSmoothSTDMax(imgOrig, imgIn)
+    val = 1000000000000000;
+    count = 0;% Do square Matrix Only
+    for x = 1:1000000000000%Large, x will be in steps of 0.01
+         if (ImgIMMSEforOptimisation(imgOrig, GaussSmoothSTD(imgIn, x/100)) <= val)%Note Equality sign, going in small steps means some filters look alike
+            val = ImgIMMSEforOptimisation(imgOrig, GaussSmoothSTD(imgIn, x/100));
+            count = x/100;
+         else
+             break;
+        end
+    end
+end
+%Optimal Wiener Filter
+function count = BoxFiltNMMax(imgOrig, imgIn)
+    val = 1000000000000000;
+    count = 0;% Do square Matrix Only
+    for x = 3:size(imgIn,1)%Biggest square for data set
+        if (mod(x,2) == 0 )
+            continue;
+        end
+         if (ImgIMMSEforOptimisation(imgOrig, BoxFiltNM(imgIn, x)) < val)
+            val = ImgIMMSEforOptimisation(imgOrig, BoxFiltNM(imgIn, x));
+            count = x;
+         else
+             break;
+        end
+    end
+end
